@@ -3,85 +3,29 @@
 #include <math.h>
 #include <pthread.h>
 #include <stdio.h>
-
+#include "random437.h"
 #define NO_ARG 101
 #define MAXWAITPEOPLE 800
+#define MORNING 7199
+#define NOON 17999
+#define AFTERNOON 25200
 
 const int max_int = 0x7FFFFFFF;
 
-int timeCounter = 0; //used to simulate a timer
+long time = 0; //used to simulate a timer
 int waiting = 0; //number of people waiting in line
-int meanArrival = 0; //mean number of people arriving, will change when needed
+int meanArrival = 25; //mean number of people arriving, will change when needed
 int carNum;//number of cars
-int maxPerCar;//number opf max people per car
+int maxPerCar;//number of max people per car
 
+pthread_mutex_t waitingAreaLock;
 //for end of day display
 int totalArrived = 0;
 int totalRide = 0;
 int totalLeft = 0;//people that left due to the line being too long
 int avgWait = 0;//average waiting time per person(in minutes)
-int longestLine = 0;//length of line at worst case(when the line was longest)
-int longestTime = 0;//time that line was at its worst
-
-int pseudo = 1;
-void Random();
-double random_real();
-int random_integer(int low, int high);
-int poisson(double mean);
-
-int reseed();
-int seed;
-int multiplier;
-int add_on;
-
-
-int reseed()
-{
-  seed = seed * multiplier + add_on;
-  return seed;
-}
-
-void Random()
-{
-  if (pseudo)
-    seed = 1;
-  else
-  {
-    srandom(getpid());
-    seed = random();
-  }
-  multiplier = 2743;
-  add_on = 5923;
-}
-
-double random_real()
-{
-  double max = max_int+1.0;
-  double temp = reseed();
-  if (temp < 0) temp = temp + max;
-  return temp/max;
-}
-
-int random_integer(int low, int high)
-{
-  if (low > high) 
-    return random_integer(high,low);
-  else
-    return ((int)((high-low+1)*random_real())) + low;
-}
-
-int poisson(double mean)
-{
-  double limit = exp(-mean);
-  double product = random_real();
-  int    count = 0;
-  while (product > limit)
-  {
-    count++;
-    product *= random_real();
-  }
-  return count;
-}
+int lll = 0; //Length of Longest Line
+int toll = 0; //Time of Occurence of Longest Line
 
 void uMessage(const char * pName)
 {
@@ -92,15 +36,39 @@ void uMessage(const char * pName)
 //do thread stuff here
 void* startLine()
 {
-  
+  int before;
+  pthread_lock(&waitingAreaLock);
+  time += 7;
+  before = waiting;
+  waiting-= maxPerCar;
+  if (waiting < 0) waiting = 0;
+  totalRide += before - waiting;
+  pthread_unlock(&waitingAreaLock);
 }
 
 //used by the reporter thread and to increment our time and call poisson
 void* reporterThread()
 {
   //after every second
-  waiting += poisson(meanArrival);
-  
+  int arrival;
+  pthread_lock(&waitingAreaLock);
+  if (time > AFTERNOON) meanArrival = 25;
+  else if (time > NOON) meanArrival = 35;
+  else if (time > MORNING) meanArrival = 45;
+  arrival = poisson(meanArrival);
+  totalArrived += arrival;
+  waiting += arrival;
+  if(waiting > MAXWAITPEOPLE)
+  {
+    totalLeft += waiting - MAXWAITPEOPLE;
+    waiting = MAXWAITPEOPLE;
+  }
+  if (waiting > lll)
+  {
+    lll = waiting;
+    toll = time;
+  }
+  pthread_ulock(&waitingAreaLock);
 }
 
 int main(int argc, char* argv[])

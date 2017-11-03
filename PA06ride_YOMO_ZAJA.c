@@ -10,9 +10,9 @@
 #define NOON 17999
 #define AFTERNOON 25200
 
-const int max_int = 0x7FFFFFFF;
+//const int max_int = 0x7FFFFFFF;
 
-long time = 0; //used to simulate a timer
+long simTime = 0; //used to simulate a timer
 int waiting = 0; //number of people waiting in line
 int meanArrival = 25; //mean number of people arriving, will change when needed
 int carNum;//number of cars
@@ -25,7 +25,7 @@ int totalRide = 0;
 int totalLeft = 0;//people that left due to the line being too long
 int avgWait = 0;//average waiting time per person(in minutes)
 int lll = 0; //Length of Longest Line
-int toll = 0; //Time of Occurence of Longest Line
+long toll = 0; //Time of Occurence of Longest Line
 
 void uMessage(const char * pName)
 {
@@ -37,13 +37,13 @@ void uMessage(const char * pName)
 void* startLine()
 {
   int before;
-  pthread_lock(&waitingAreaLock);
-  time += 7;
+  pthread_mutex_lock(&waitingAreaLock);
+  simTime += 7;
   before = waiting;
   waiting-= maxPerCar;
   if (waiting < 0) waiting = 0;
   totalRide += before - waiting;
-  pthread_unlock(&waitingAreaLock);
+  pthread_mutex_unlock(&waitingAreaLock);
 }
 
 //used by the reporter thread and to increment our time and call poisson
@@ -51,10 +51,10 @@ void* reporterThread()
 {
   //after every second
   int arrival;
-  pthread_lock(&waitingAreaLock);
-  if (time > AFTERNOON) meanArrival = 25;
-  else if (time > NOON) meanArrival = 35;
-  else if (time > MORNING) meanArrival = 45;
+  pthread_mutex_lock(&waitingAreaLock);
+  if (simTime > AFTERNOON) meanArrival = 25;
+  else if (simTime > NOON) meanArrival = 35;
+  else if (simTime > MORNING) meanArrival = 45;
   arrival = poisson(meanArrival);
   totalArrived += arrival;
   waiting += arrival;
@@ -66,9 +66,9 @@ void* reporterThread()
   if (waiting > lll)
   {
     lll = waiting;
-    toll = time;
+    toll = simTime;
   }
-  pthread_ulock(&waitingAreaLock);
+  pthread_mutex_unlock(&waitingAreaLock);
 }
 
 int main(int argc, char* argv[])
@@ -106,18 +106,13 @@ int main(int argc, char* argv[])
   { 
     perror("Error in thread creating\n"); return(1);
   }
-  
-  for (i = 0; i < carNum; i++)
+
+  //join all threads, including the reporter
+  for (i = 0; i < carNum + 1; i++)
     if (pthread_join(tid[i], (void*)&voidptr))
     { 
       perror("Error in thread joining\n"); return(1);
     }
-
-  //join the report thread
-  if (pthread_join(tid[carNum], (void*)&voidptr))
-  { 
-    perror("Error in thread joining\n"); return(1);
-  }
 
   return 0;
 }

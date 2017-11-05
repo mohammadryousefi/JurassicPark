@@ -10,14 +10,14 @@
 #define MORNING 7199
 #define NOON 17999
 #define AFTERNOON 25200
-
-pthread_mutex_t wait_mut; // For loading purposes.
+#define DEBUG 0
+// pthread_mutex_t wait_mut; // For loading purposes.
 pthread_mutex_t timer_mut;
 pthread_mutex_t barrier_mut;
 pthread_cond_t barrier_cond;
 pthread_cond_t timer_cond;
 
-long simTime, lastDeparture, longestLineTime;
+long simTime, lastDeparture, longestLineTime, waitingTime;
 int numCars, maxPerCar;
 int threadCount, meanArrival, currentlyWaiting, totalArrivals, totalAccepted, totalRejected, averageWait, longestLineLength;
 
@@ -42,11 +42,10 @@ void* workerThread()
     if (simTime >= 36000) // SIMULATION FINISHED
     {
       pthread_mutex_unlock(&timer_mut);
-      pthread_mutex_lock(&barrier_mut);
-      numCars--;
-      if (numCars < 1) pthread_cond_signal(&timer_cond);
-      printf("%ld: exiting.\n", pthread_self());
-      pthread_mutex_unlock(&barrier_mut);
+//      pthread_mutex_lock(&barrier_mut);
+//      numCars--;
+//      if (numCars < 1) pthread_cond_signal(&timer_cond);
+//      pthread_mutex_unlock(&barrier_mut);
       return 0;
     }
     if (simTime == timeOfReturn) // Return from ride
@@ -60,7 +59,7 @@ void* workerThread()
     /*****************************************************************/
     if (simTime >= lastDeparture + 7 && !outOnRide)
     {
-      pthread_mutex_lock(&wait_mut);
+//      pthread_mutex_lock(&wait_mut);
       lastDeparture = simTime;
       timeOfReturn = lastDeparture + 60;
       outOnRide = 1;
@@ -68,7 +67,7 @@ void* workerThread()
       currentlyWaiting -= maxPerCar;
       if (currentlyWaiting < 0) currentlyWaiting = 0;
       totalAccepted += waitingBeforeRide - currentlyWaiting;
-      pthread_mutex_unlock(&wait_mut);
+//      pthread_mutex_unlock(&wait_mut);
     }
     pthread_mutex_unlock(&timer_mut);
 
@@ -95,20 +94,23 @@ void* reporterThread()
   while(1)
   {
     pthread_mutex_lock(&timer_mut);
+    simTime++;
     if (simTime >= 36000) // SIMULATION FINISHED
     {
       pthread_mutex_unlock(&timer_mut);
+      pthread_mutex_lock(&barrier_mut);
+      pthread_cond_broadcast(&barrier_cond);
+      pthread_mutex_unlock(&barrier_mut);
       return 0;
     }
-    simTime++;
     if(simTime % 60 == 0)
     {
       if (simTime > AFTERNOON) meanArrival = 25;
       else if (simTime > NOON) meanArrival = 35;
       else if (simTime > MORNING) meanArrival = 45;
-      pthread_mutex_lock(&wait_mut);
+//      pthread_mutex_lock(&wait_mut);
       int rejected = 0;
-      int arrival = 25;//poisson(meanArrival);
+      int arrival = poisson(meanArrival);
       totalArrivals += arrival;
       currentlyWaiting += arrival;
       if(currentlyWaiting > MAXWAITPEOPLE)
@@ -117,13 +119,14 @@ void* reporterThread()
         totalRejected += rejected;
         currentlyWaiting = MAXWAITPEOPLE;
       }
-      printf("%03ld arrive %d reject %d wait-line %d at %02ld:%02ld:%02ld\n", simTime / 60, arrival, rejected, currentlyWaiting, 9 + (simTime / 3600), (simTime % 3600) / 60, simTime % 60);
+      waitingTime += currentlyWaiting;
+      printf("%03ld arrive %02d reject %02d wait-line %03d at %02ld:%02ld:%02ld\n", simTime / 60, arrival, rejected, currentlyWaiting, 9 + (simTime / 3600), (simTime % 3600) / 60, simTime % 60);
       if (currentlyWaiting > longestLineLength)
       {
         longestLineLength = currentlyWaiting;
         longestLineTime = simTime;
       }
-      pthread_mutex_unlock(&wait_mut);
+//      pthread_mutex_unlock(&wait_mut);
     }
     pthread_mutex_unlock(&timer_mut);
     pthread_mutex_lock(&barrier_mut);
@@ -135,7 +138,7 @@ void* reporterThread()
 
 void initLocks(void)
 {
-  pthread_mutex_init(&wait_mut, NULL);
+//  pthread_mutex_init(&wait_mut, NULL);
   pthread_mutex_init(&timer_mut, NULL);
   pthread_mutex_init(&barrier_mut, NULL);
   pthread_cond_init(&barrier_cond, NULL);
@@ -144,7 +147,7 @@ void initLocks(void)
 
 void destroyLocks(void)
 {
-  pthread_mutex_destroy(&wait_mut);
+//  pthread_mutex_destroy(&wait_mut);
   pthread_mutex_destroy(&timer_mut);
   pthread_mutex_destroy(&barrier_mut);
   pthread_cond_destroy(&barrier_cond);
@@ -175,6 +178,7 @@ void init(int argc, char* argv[])
 {
   initParameters(argc, argv);
   initLocks();  
+  Random(DEBUG);
   simTime = 0;
   meanArrival = 25;
   currentlyWaiting = poisson(meanArrival);
@@ -186,7 +190,8 @@ void init(int argc, char* argv[])
   totalRejected = 0;
   averageWait = 0;
   threadCount = 0;
-  printf("%03ld arrive %d reject %d wait-line %d at %02ld:%02ld:%02ld\n", simTime / 60, currentlyWaiting, totalRejected, currentlyWaiting, 9 + (simTime / 3600), (simTime % 3600) / 60, simTime % 60);
+  waitingTime = 0;
+  printf("%03ld arrive %02d reject %02d wait-line %03d at %02ld:%02ld:%02ld\n", simTime / 60, currentlyWaiting, totalRejected, currentlyWaiting, 9 + (simTime / 3600), (simTime % 3600) / 60, simTime % 60);
   }
 int main(int argc, char* argv[])
 {
@@ -219,5 +224,6 @@ int main(int argc, char* argv[])
     }
   
   destroyLocks();
+  printf("Daily Result: Total Arrivals %d, Total Rejections %d, Rejection Ratio %.2f, Average Wait %.2f, Max Waitline %d\n", totalArrivals, totalRejected, (double) totalRejected * 100 / totalArrivals, (double) waitingTime / totalAccepted / 60, longestLineLength);
   return 0;
 }

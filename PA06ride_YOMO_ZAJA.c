@@ -45,6 +45,7 @@ void* workerThread()
       pthread_mutex_lock(&barrier_mut);
       numCars--;
       if (numCars < 1) pthread_cond_signal(&timer_cond);
+      printf("%ld: exiting.\n", pthread_self());
       pthread_mutex_unlock(&barrier_mut);
       return 0;
     }
@@ -94,12 +95,12 @@ void* reporterThread()
   while(1)
   {
     pthread_mutex_lock(&timer_mut);
-    simTime++;
     if (simTime >= 36000) // SIMULATION FINISHED
     {
       pthread_mutex_unlock(&timer_mut);
       return 0;
     }
+    simTime++;
     if(simTime % 60 == 0)
     {
       if (simTime > AFTERNOON) meanArrival = 25;

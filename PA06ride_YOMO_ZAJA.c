@@ -34,12 +34,10 @@ void* workerThread()
 
   pthread_mutex_lock(&barrier_mut);
   pthread_mutex_unlock(&barrier_mut);
-  printf("Worker Started\n");
   int timeOfReturn = 0;
   int outOnRide = 0;
   while (1)
   {
-    printf("Worker working\n");
     pthread_mutex_lock(&timer_mut);
     if (simTime >= 36000) // SIMULATION FINISHED
     {
@@ -78,15 +76,12 @@ void* workerThread()
     threadCount++;
     if (threadCount == numCars)
     {
-      printf("BARRIER HIT\n");
       threadCount = 0;
       pthread_cond_signal(&timer_cond);
-      printf("%d sleeping.\n", threadCount);
       pthread_cond_wait(&barrier_cond, &barrier_mut);
     }
     else
     {
-      printf("%d sleeping, ", threadCount);
       pthread_cond_wait(&barrier_cond, &barrier_mut);
     }
     pthread_mutex_unlock(&barrier_mut);
@@ -96,7 +91,6 @@ void* workerThread()
 //used by the reporter thread and to increment our time and call poisson
 void* reporterThread()
 {
-  printf("Timer Started\n");
   while(1)
   {
     pthread_mutex_lock(&timer_mut);
@@ -111,9 +105,9 @@ void* reporterThread()
       if (simTime > AFTERNOON) meanArrival = 25;
       else if (simTime > NOON) meanArrival = 35;
       else if (simTime > MORNING) meanArrival = 45;
-      int rejected = 0;
-      int arrival = poisson(meanArrival);
       pthread_mutex_lock(&wait_mut);
+      int rejected = 0;
+      int arrival = 25;//poisson(meanArrival);
       totalArrivals += arrival;
       currentlyWaiting += arrival;
       if(currentlyWaiting > MAXWAITPEOPLE)
@@ -131,11 +125,10 @@ void* reporterThread()
       pthread_mutex_unlock(&wait_mut);
     }
     pthread_mutex_unlock(&timer_mut);
-    printf("TIMER DONE!\n");
     pthread_mutex_lock(&barrier_mut);
-    printf("Signaling Workers\n");
     pthread_cond_broadcast(&barrier_cond);
     pthread_cond_wait(&timer_cond, &barrier_mut);
+    pthread_mutex_unlock(&barrier_mut);
   }
 }
 
@@ -211,13 +204,12 @@ int main(int argc, char* argv[])
       perror("Error in thread creating\n"); return(1);
     }
   pthread_cond_wait(&timer_cond, &barrier_mut);
-  printf("Creating Timer\n"); 
   //get the reporter thread on the reporterThread method
   if (pthread_create(&tid[numCars], NULL, reporterThread, NULL))
   { 
     perror("Error in thread creating\n"); return(1);
   }
-
+  pthread_mutex_unlock(&barrier_mut);
   //join all threads, including the reporter
   for (i = 0; i < numCars + 1; i++)
     if (pthread_join(tid[i], (void*)&voidptr))

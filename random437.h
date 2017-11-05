@@ -20,7 +20,6 @@ const int max_int = 0x7FFFFFFF;
     int add_on;
     };*/
 
-int pseudo = 1;
 void Random();
 double random_real();
 int random_integer(int low, int high);
@@ -51,13 +50,13 @@ int reseed()
     multiplier = 2743;
     add_on = 5923;
     }*/
-void Random()
+void Random(int pseudo)
 {
   if (pseudo)
     seed = 1;
   else
   {
-    srandom(getpid());
+    srandom(time(NULL));
     seed = random();
   }
   multiplier = 2743;

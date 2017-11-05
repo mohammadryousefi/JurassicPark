@@ -119,7 +119,6 @@ void* reporterThread()
         totalRejected += rejected;
         currentlyWaiting = MAXWAITPEOPLE;
       }
-      waitingTime += currentlyWaiting;
       printf("%03ld arrive %02d reject %02d wait-line %03d at %02ld:%02ld:%02ld\n", simTime / 60, arrival, rejected, currentlyWaiting, 9 + (simTime / 3600), (simTime % 3600) / 60, simTime % 60);
       if (currentlyWaiting > longestLineLength)
       {
@@ -128,6 +127,7 @@ void* reporterThread()
       }
 //      pthread_mutex_unlock(&wait_mut);
     }
+    waitingTime += currentlyWaiting;
     pthread_mutex_unlock(&timer_mut);
     pthread_mutex_lock(&barrier_mut);
     pthread_cond_broadcast(&barrier_cond);

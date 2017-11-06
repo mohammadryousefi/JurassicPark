@@ -20,6 +20,7 @@ pthread_cond_t timer_cond;
 long simTime, lastDeparture, longestLineTime, waitingTime;
 int numCars, maxPerCar;
 int threadCount, meanArrival, currentlyWaiting, totalArrivals, totalAccepted, totalRejected, averageWait, longestLineLength;
+FILE * fd;
 
 void uMessage(const char * pName)
 {
@@ -119,6 +120,7 @@ void* reporterThread()
         totalRejected += rejected;
         currentlyWaiting = MAXWAITPEOPLE;
       }
+      fprintf(fd, "%ld,%d,%d,%d\n", simTime / 60, currentlyWaiting, arrival, rejected);
       printf("%03ld arrive %02d reject %02d wait-line %03d at %02ld:%02ld:%02ld\n", simTime / 60, arrival, rejected, currentlyWaiting, 9 + (simTime / 3600), (simTime % 3600) / 60, simTime % 60);
       if (currentlyWaiting > longestLineLength)
       {
@@ -191,15 +193,23 @@ void init(int argc, char* argv[])
   averageWait = 0;
   threadCount = 0;
   waitingTime = 0;
+  
   printf("%03ld arrive %02d reject %02d wait-line %03d at %02ld:%02ld:%02ld\n", simTime / 60, currentlyWaiting, totalRejected, currentlyWaiting, 9 + (simTime / 3600), (simTime % 3600) / 60, simTime % 60);
   }
 int main(int argc, char* argv[])
 {
   int i;
   void* voidptr=NULL;
-  
+  char* filename = calloc(13, 1);
   init(argc, argv);
-  
+  sprintf(filename, "Report_%d_%d", numCars, maxPerCar);
+  fd = fopen(filename, "w+");
+  if (fd == NULL)
+  {
+    fprintf(stderr, "Failed to open report file.\n");
+    exit(1);
+  }
+  fprintf(fd, "%ld,%d,%d,%d\n", simTime, currentlyWaiting, totalArrivals, totalRejected);
   pthread_t tid[numCars+1];//need a thread for every car, and one more to report 
   srand(getpid());
 

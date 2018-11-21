@@ -1,2 +1,2 @@
-main: PA06ride_YOMO_ZAJA.c
-	gcc PA06ride_YOMO_ZAJA.c -lm -lpthread -o sim
+main: JurassicPark.c
+	gcc JurassicPark.c -lm -lpthread -o JP_Simulation
